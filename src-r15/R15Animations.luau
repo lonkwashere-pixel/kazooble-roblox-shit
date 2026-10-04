@@ -232,14 +232,21 @@ function Bridge:pose(state,speed,dt,motion)
     if not SUPPORTED[state] and not paused then
         self:_stop();self:_attribute("R15Source","Banjo special move");return nil
     end
+    local seated=paused and self.nativeHumanoid and (self.nativeHumanoid.SeatPart~=nil
+        or self.nativeHumanoid:GetState()==Enum.HumanoidStateType.Seated)
+    local key,rate=clipFor(state,speed or 0,motion,seated)
+    -- Check the selected family before reading a live pose too: a native sit or
+    -- walk track must not bypass its disabled menu switch.
+    if self.runtime and self.runtime:GetAttribute("R15Use_"..key)==false then
+        self:_stop();self:_attribute("R15Source","Banjo");self:_attribute("R15Clip","Banjo "..key)
+        self:_status("Using Banjo "..key);return nil
+    end
     local joints
-    if self:_useNative(paused) then
+    local allowGamePose=not self.runtime or self.runtime:GetAttribute("R15Use_game")~=false
+    if allowGamePose and self:_useNative(paused) then
         self:_stop();joints=self.nativeJoints
         self:_attribute("R15Source","Native avatar pose");self:_attribute("R15Clip","Live")
     else
-        local seated=paused and self.nativeHumanoid and (self.nativeHumanoid.SeatPart~=nil
-            or self.nativeHumanoid:GetState()==Enum.HumanoidStateType.Seated)
-        local key,rate=clipFor(state,speed or 0,motion,seated)
         local id=self.clips[key]
         local track=id and self:_track(id,key)
         if not track then
